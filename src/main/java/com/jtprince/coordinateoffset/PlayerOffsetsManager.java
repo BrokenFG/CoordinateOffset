@@ -12,7 +12,7 @@ import java.util.UUID;
 /**
  * Container for the offsets all players currently have.
  */
-class PlayerOffsetsManager {
+public class PlayerOffsetsManager {
     private final CoordinateOffset plugin;
 
     private final Map<UUID, Map<UUID, Offset>> playerOffsets = new HashMap<>();
@@ -91,7 +91,7 @@ class PlayerOffsetsManager {
      * join, respawn, or teleport.</p>
      * @param context Offset generation context, containing the player and world that should have an offset regenerated.
      */
-    synchronized void regenerateOffset(OffsetProviderContext context) {
+    synchronized public void regenerateOffset(OffsetProviderContext context) {
         Offset newOffset = plugin.getOffsetProviderManager().provideOffset(context);
 
         Map<UUID, Offset> offsetPerWorldCache = playerOffsets.computeIfAbsent(context.player().getUniqueId(), k -> new HashMap<>());

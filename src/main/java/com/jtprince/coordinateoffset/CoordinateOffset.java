@@ -137,11 +137,11 @@ public final class CoordinateOffset extends JavaPlugin {
         providerManager.registerConfigurationFactory(className, providerConfigFactory);
     }
 
-    PlayerOffsetsManager getPlayerManager() {
+    public PlayerOffsetsManager getPlayerManager() {
         return playerOffsetsManager;
     }
 
-    OffsetProviderManager getOffsetProviderManager() {
+    public OffsetProviderManager getOffsetProviderManager() {
         return providerManager;
     }
 

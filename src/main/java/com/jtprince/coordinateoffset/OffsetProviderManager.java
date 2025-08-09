@@ -11,10 +11,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
-class OffsetProviderManager {
+public class OffsetProviderManager {
     private final CoordinateOffset plugin;
     private final Map<String, OffsetProvider.ConfigurationFactory<?>> configFactories = new HashMap<>();
     private Map<String, OffsetProvider> providersFromConfig = new HashMap<>();
+    private List<Player> offsetPlayers = new ArrayList<>();
 
     private OffsetProvider defaultProvider;
     private List<ProviderOverride> overrides = Collections.emptyList();
@@ -125,6 +126,14 @@ class OffsetProviderManager {
         plugin.getLogger().info("Loaded " + newProviders.size() + " offset providers from config. Default offset provider is \"" + defaultProvider.name + "\"" + overrideCountStr);
     }
 
+    public void addOffsetPlayer(Player player) {
+        offsetPlayers.add(player);
+    }
+
+    public void removeOffsetPlayer(Player player) {
+        offsetPlayers.remove(player);
+    }
+
     OffsetProvider getDefaultProvider() {
         return defaultProvider;
     }
@@ -137,6 +146,8 @@ class OffsetProviderManager {
         try {
             previousOffset = plugin.getPlayerManager().getOffset(context.player(), context.world());
         } catch (NoSuchElementException ignored) {}
+
+        if (!offsetPlayers.contains(context.player())) return Offset.ZERO;
 
         // Priority 0: Permission-based bypass
         if (plugin.getConfig().getBoolean("bypassByPermission") &&
