@@ -16,16 +16,29 @@ class PacketOffsetAdapter {
     private final CoordinateOffset coPlugin;
     private final Logger logger;
     private final PacketDebugger packetHistory;
+    private final PartialStacktraceLogger partialStacktraceLogger;
+
+    private final long stacktraceRateLimitMs = 2500; // 2.5 seconds
 
     PacketOffsetAdapter(CoordinateOffset plugin) {
         this.coPlugin = plugin;
         this.logger = plugin.getLogger();
         this.packetHistory = new PacketDebugger(plugin);
+
+        this.partialStacktraceLogger = new PartialStacktraceLogger(logger);
+        Bukkit.getServer().getScheduler().runTaskTimer(coPlugin, () -> {
+            this.partialStacktraceLogger.flushRateLimits(stacktraceRateLimitMs);
+        }, stacktraceRateLimitMs / 50, stacktraceRateLimitMs / 50);
     }
 
     void registerAdapters() {
         PacketEvents.getAPI().getEventManager().registerListener(new Listener());
         PacketEvents.getAPI().init();
+    }
+
+    void onDisable() {
+        PacketEvents.getAPI().terminate();
+        this.partialStacktraceLogger.flushRateLimits(0);
     }
 
     private class Listener extends PacketListenerAbstract {
@@ -45,6 +58,12 @@ class PacketOffsetAdapter {
 
         @Override
         public void onPacketSend(PacketSendEvent event) {
+            /*
+             * Ignore LOGIN and CONFIGURATION packets; these are sent before the players spawn (and therefore before
+             * an offset is generated). Only PLAY packets contain coordinates that need to be offset.
+             */
+            if (!(event.getPacketType() instanceof PacketType.Play.Server)) return;
+
             if (coPlugin.isDebugEnabled()) {
                 packetHistory.logPacket(event.getUser(), event.getPacketType());
             }
@@ -86,9 +105,11 @@ class PacketOffsetAdapter {
 
                 OffsetterRegistry.attemptToOffset(event, offset);
             } catch (Exception e) {
-                PartialStacktraceLogger.logStacktrace(logger, "Failed to apply offset for outgoing packet " +
-                        event.getPacketType().getName() + " to " + event.getUser().getName(), e);
-                if (coPlugin.isDebugEnabled()) {
+                boolean logged = partialStacktraceLogger.logStacktraceRateLimited(logger,
+                    "Failed to apply offset for outgoing packet " +
+                        event.getPacketType().getName() + " to " + event.getUser().getName(),
+                    e, stacktraceRateLimitMs, event.getUser().getName());
+                if (logged && coPlugin.isDebugEnabled()) {
                     logger.warning("Packet history for above stacktrace: " + packetHistory.getHistory(event.getUser()));
                 }
             }
@@ -96,6 +117,12 @@ class PacketOffsetAdapter {
 
         @Override
         public void onPacketReceive(PacketReceiveEvent event) {
+            /*
+             * Ignore LOGIN and CONFIGURATION packets; these are sent before the players spawn (and therefore before
+             * an offset is generated). Only PLAY packets contain coordinates that need to be offset.
+             */
+            if (!(event.getPacketType() instanceof PacketType.Play.Client)) return;
+
             if (coPlugin.isDebugEnabled()) {
                 packetHistory.logPacket(event.getUser(), event.getPacketType());
             }
@@ -109,9 +136,11 @@ class PacketOffsetAdapter {
 
                 OffsetterRegistry.attemptToUnOffset(event, offset);
             } catch (Exception e) {
-                PartialStacktraceLogger.logStacktrace(logger, "Failed to reverse offset for incoming packet " +
-                        event.getPacketType().getName() + " from " + event.getUser().getName(), e);
-                if (coPlugin.isDebugEnabled()) {
+                boolean logged = partialStacktraceLogger.logStacktraceRateLimited(logger,
+                    "Failed to reverse offset for incoming packet " +
+                        event.getPacketType().getName() + " from " + event.getUser().getName(),
+                    e, stacktraceRateLimitMs, event.getUser().getName());
+                if (logged && coPlugin.isDebugEnabled()) {
                     logger.warning("Packet history for above stacktrace: " + packetHistory.getHistory(event.getUser()));
                 }
             }
